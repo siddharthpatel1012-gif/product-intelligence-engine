@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Intelligence Engine — Unilog × UniHack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A1420;
+    --bg-panel:#0F1D2E;
+    --bg-panel-raised:#132539;
+    --grid-line:#1C3350;
+    --grid-line-soft:#16283F;
+    --text-primary:#E7EEF6;
+    --text-muted:#7E93AC;
+    --text-dim:#54677E;
+    --accent:#4FD1FF;
+    --accent-dim:#2A5670;
+    --sig-high:#3ED598;
+    --sig-high-dim:#123B2C;
+    --sig-med:#F5A623;
+    --sig-med-dim:#3A2A0C;
+    --sig-low:#FF6B6B;
+    --sig-low-dim:#3A1616;
+    --font-mono:'IBM Plex Mono', monospace;
+    --font-sans:'IBM Plex Sans', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--grid-line-soft) 1px, transparent 1px) 0 0/100% 32px,
+      linear-gradient(90deg, var(--grid-line-soft) 1px, transparent 1px) 0 0/32px 100%,
+      var(--bg);
+    color:var(--text-primary);
+    font-family:var(--font-sans);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--accent-dim);color:var(--text-primary);}
+  a{color:var(--accent);}
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms !important; transition-duration:.001ms !important;}
+  }
+
+  .wrap{max-width:1240px;margin:0 auto;padding:28px 24px 80px;}
+
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:1px solid var(--grid-line);
+    padding-bottom:20px;margin-bottom:24px;
+    flex-wrap:wrap;gap:16px;
+  }
+  .eyebrow{
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 8px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .eyebrow::before{content:'';width:6px;height:6px;background:var(--accent);border-radius:1px;display:inline-block;box-shadow:0 0 8px var(--accent);}
+  h1{font-family:var(--font-mono);font-weight:600;font-size:clamp(20px,3vw,28px);margin:0;letter-spacing:-.01em;}
+  .subtitle{color:var(--text-muted);font-size:13.5px;margin-top:6px;max-width:540px;line-height:1.5;}
+  .doc-id{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);text-align:right;line-height:1.6;}
+  .doc-id b{color:var(--text-muted);font-weight:500;}
+
+  .tabs{display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid var(--grid-line);}
+  .tab{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+    padding:10px 16px;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;
+    background:none;border-top:none;border-left:none;border-right:none;
+  }
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:20px;}
+  @media (max-width:860px){.grid{grid-template-columns:1fr;}}
+
+  .panel{background:var(--bg-panel);border:1px solid var(--grid-line);position:relative;}
+  .panel::before{content:'';position:absolute;top:-1px;left:-1px;width:10px;height:10px;border-top:1px solid var(--accent);border-left:1px solid var(--accent);}
+  .panel::after{content:'';position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-bottom:1px solid var(--accent);border-right:1px solid var(--accent);}
+  .panel-head{
+    padding:14px 18px;border-bottom:1px solid var(--grid-line);
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .panel-body{padding:18px;}
+
+  label{display:block;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);margin:0 0 6px;}
+  .field{margin-bottom:16px;}
+  input[type=text], textarea{
+    width:100%;background:var(--bg);border:1px solid var(--grid-line);color:var(--text-primary);
+    font-family:var(--font-mono);font-size:13.5px;padding:10px 11px;outline:none;transition:border-color .15s;
+  }
+  textarea{resize:vertical;min-height:56px;font-family:var(--font-sans);}
+  input[type=text]:focus, textarea:focus{border-color:var(--accent);}
+  input[type=text]::placeholder, textarea::placeholder{color:var(--text-dim);}
+  .field-hint{font-size:11px;color:var(--text-dim);margin-top:5px;}
+
+  .btn{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;
+    background:var(--accent);color:#03141F;border:none;padding:12px 16px;cursor:pointer;width:100%;
+    transition:filter .15s, transform .06s;
+  }
+  .btn:hover{filter:brightness(1.12);}
+  .btn:active{transform:scale(.99);}
+  .btn:disabled{background:var(--grid-line);color:var(--text-dim);cursor:not-allowed;}
+  .btn-ghost{background:transparent;border:1px solid var(--grid-line);color:var(--text-muted);margin-top:8px;}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent);filter:none;}
+  .btn-small{width:auto;padding:8px 12px;font-size:11px;}
+
+  details.advanced{margin-top:18px;border-top:1px solid var(--grid-line);padding-top:14px;}
+  details.advanced summary{cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:.06em;text-transform:uppercase;}
+  details.advanced .field{margin-top:14px;margin-bottom:0;}
+
+  .stepper{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--grid-line);}
+  .step{padding:14px;border-right:1px solid var(--grid-line);position:relative;}
+  .step:last-child{border-right:none;}
+  .step-num{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .step-dot{width:7px;height:7px;border-radius:50%;background:var(--grid-line);transition:all .2s;}
+  .step-name{font-family:var(--font-mono);font-size:12.5px;color:var(--text-muted);}
+  .step-detail{font-size:10.5px;color:var(--text-dim);margin-top:3px;min-height:13px;}
+  .step.active .step-dot{background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 1s infinite;}
+  .step.active .step-name{color:var(--text-primary);}
+  .step.done .step-dot{background:var(--sig-high);}
+  .step.done .step-name{color:var(--text-primary);}
+  .step.error .step-dot{background:var(--sig-low);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  .event-log{
+    font-family:var(--font-mono);font-size:11px;line-height:1.9;color:var(--text-dim);
+    padding:12px 18px;max-height:120px;overflow-y:auto;border-bottom:1px solid var(--grid-line);
+    display:none;
+  }
+  .event-log.visible{display:block;}
+  .event-log .ev{opacity:0;animation:fadein .3s forwards;}
+  .event-log .ev .t{color:var(--accent);margin-right:8px;}
+  @keyframes fadein{to{opacity:1;}}
+
+  .empty-state{padding:60px 30px;text-align:center;color:var(--text-dim);}
+  .empty-state .glyph{font-family:var(--font-mono);font-size:28px;color:var(--grid-line);margin-bottom:14px;letter-spacing:.3em;}
+  .empty-state p{font-size:13px;max-width:340px;margin:0 auto;line-height:1.6;}
+  .error-state{padding:20px;border-left:2px solid var(--sig-low);background:var(--sig-low-dim);font-family:var(--font-mono);font-size:12.5px;color:#FFC9C9;line-height:1.6;}
+
+  .result-head{display:flex;justify-content:space-between;align-items:center;padding:18px;border-bottom:1px solid var(--grid-line);flex-wrap:wrap;gap:14px;}
+  .result-title h2{font-family:var(--font-mono);font-size:17px;margin:0 0 4px;font-weight:600;}
+  .result-title .mpn-tag{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:.05em;}
+  .gauge{display:flex;align-items:center;gap:12px;}
+  .gauge-ring{width:56px;height:56px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:14px;font-weight:600;}
+  .gauge-label{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;}
+
+  .field-list{padding:6px 0;}
+  .field-row{
+    display:grid;grid-template-columns:26px 150px 1fr 90px;align-items:start;gap:14px;padding:13px 18px;
+    border-bottom:1px solid var(--grid-line-soft);
+    opacity:0;transform:translateY(4px);animation:rowin .35s ease forwards;
+  }
+  @keyframes rowin{to{opacity:1;transform:translateY(0);}}
+  .field-row:hover{background:var(--bg-panel-raised);}
+  .led{width:9px;height:9px;border-radius:50%;margin-top:5px;box-shadow:0 0 6px currentColor;}
+  .led.high{background:var(--sig-high);color:var(--sig-high);}
+  .led.medium{background:var(--sig-med);color:var(--sig-med);}
+  .led.low{background:var(--sig-low);color:var(--sig-low);}
+  .field-key{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;padding-top:2px;word-break:break-word;}
+  .field-val{font-size:14px;line-height:1.5;color:var(--text-primary);}
+  .field-val .none{color:var(--text-dim);font-style:italic;}
+  .field-meta{text-align:right;font-family:var(--font-mono);font-size:11px;position:relative;}
+  .conf-pct{font-weight:600;cursor:help;border-bottom:1px dotted currentColor;}
+  .conf-pct.high{color:var(--sig-high);}
+  .conf-pct.medium{color:var(--sig-med);}
+  .conf-pct.low{color:var(--sig-low);}
+  .review-tag{display:inline-block;margin-top:4px;font-size:9.5px;letter-spacing:.05em;color:var(--sig-low);border:1px solid var(--sig-low);padding:1px 5px;text-transform:uppercase;}
+  .source-links{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;}
+  .source-links a{font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim);text-decoration:none;border-bottom:1px dotted var(--grid-line);}
+  .source-links a:hover{color:var(--accent);border-color:var(--accent);}
+
+  .breakdown-tip{
+    position:absolute;top:100%;right:0;margin-top:8px;width:200px;z-index:5;
+    background:var(--bg-panel-raised);border:1px solid var(--accent-dim);padding:10px 12px;
+    font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);text-align:left;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);display:none;
+  }
+  .field-meta.tip-open .breakdown-tip{display:block;}
+  .breakdown-tip .row{display:flex;justify-content:space-between;padding:2px 0;}
+  .breakdown-tip .row b{color:var(--text-primary);}
+  .breakdown-tip .flag{color:var(--sig-med);margin-top:5px;padding-top:5px;border-top:1px solid var(--grid-line);}
+
+  .section-label{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);padding:16px 18px 8px;border-top:1px solid var(--grid-line);}
+  .images-strip{display:flex;gap:10px;padding:0 18px 16px;flex-wrap:wrap;}
+  .images-strip img{width:64px;height:64px;object-fit:cover;border:1px solid var(--grid-line);background:var(--bg);}
+
+  .sources-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .sources-table td{padding:9px 18px;border-bottom:1px solid var(--grid-line-soft);}
+  .sources-table td:first-child{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;}
+  .sources-table td a{font-size:12px;text-decoration:none;}
+  .sources-table td a:hover{text-decoration:underline;}
+  .auth-bar{display:inline-block;width:44px;height:5px;background:var(--grid-line);vertical-align:middle;margin-left:8px;position:relative;top:-1px;}
+  .auth-bar span{display:block;height:100%;background:var(--accent);}
+
+  .queue-list{padding:6px 0;}
+  .queue-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;padding:10px 18px;border-bottom:1px solid var(--grid-line-soft);align-items:center;}
+  .queue-row input{font-size:12.5px;padding:8px 9px;}
+  .queue-remove{background:none;border:1px solid var(--grid-line);color:var(--text-dim);cursor:pointer;padding:8px 10px;font-family:var(--font-mono);}
+  .queue-remove:hover{border-color:var(--sig-low);color:var(--sig-low);}
+  .queue-actions{padding:14px 18px;display:flex;gap:10px;}
+
+  .compare-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;padding:18px;}
+  .compare-card{background:var(--bg-panel-raised);border:1px solid var(--grid-line);padding:14px;cursor:pointer;transition:border-color .15s;}
+  .compare-card:hover{border-color:var(--accent);}
+  .compare-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+  .compare-card .cc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+  .compare-card .cc-mpn{font-family:var(--font-mono);font-size:12.5px;font-weight:600;}
+  .compare-card .cc-brand{font-size:11px;color:var(--text-dim);}
+  .compare-card .cc-status{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--text-dim);}
+  .compare-card .cc-conf{font-family:var(--font-mono);font-size:22px;font-weight:600;margin:6px 0 2px;}
+  .compare-card .cc-flags{font-size:10.5px;color:var(--sig-med);}
+  .compare-card .cc-bar{height:4px;background:var(--grid-line);margin-top:8px;overflow:hidden;}
+  .compare-card .cc-bar span{display:block;height:100%;transition:width .4s ease;}
+
+  footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--grid-line);font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .legend .led{margin-top:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="eyebrow">Unilog × UniHack — Product Intelligence Engine</p>
+      <h1>Minimal Input → Commerce-Ready Product Data</h1>
+      <p class="subtitle">Enter an MPN and brand. The pipeline retrieves sources, extracts specs (text and vision), and scores every field for confidence before it ships — live, stage by stage.</p>
+    </div>
+    <div class="doc-id">
+      DOC&nbsp;TYPE: <b>ENRICHMENT&nbsp;RUN</b><br>
+      ENGINE&nbsp;VER: <b>0.2.0</b><br>
+      MODE: <b id="mode-indicator">DEMO</b>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="single">Single Lookup</button>
+    <button class="tab" data-tab="compare">Batch Compare</button>
+  </div>
+
+  <div class="tab-panel active" id="tab-single">
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-head"><span>Query Input</span><span id="panel-status-dot" style="color:var(--text-dim)">●</span></div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="mpn">Manufacturer Part Number</label>
+            <input type="text" id="mpn" placeholder="e.g. LM358P" value="LM358P">
+          </div>
+          <div class="field">
+            <label for="brand">Brand</label>
+            <input type="text" id="brand" placeholder="e.g. Texas Instruments" value="Texas Instruments">
+          </div>
+          <div class="field">
+            <label for="description">One-line description</label>
+            <textarea id="description" placeholder="e.g. Dual operational amplifier">Dual operational amplifier</textarea>
+          </div>
+          <button class="btn" id="run-btn">Run Enrichment</button>
+          <button class="btn btn-ghost" id="demo-btn">Load Sample Result</button>
+          <details class="advanced">
+            <summary>API connection</summary>
+            <div class="field">
+              <label for="api-base">Backend URL</label>
+              <input type="text" id="api-base" placeholder="http://localhost:8000" value="http://localhost:8000">
+              <p class="field-hint">Streams from {url}/enrich/stream. Leave as-is and use "Load Sample Result" if no backend is running.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel" style="margin-bottom:20px;">
+          <div class="stepper" id="stepper">
+            <div class="step" data-step="0"><div class="step-num"><span>01</span><span class="step-dot"></span></div><div class="step-name">Retrieval</div><div class="step-detail" id="detail-0"></div></div>
+            <div class="step" data-step="1"><div class="step-num"><span>02</span><span class="step-dot"></span></div><div class="step-name">Extraction</div><div class="step-detail" id="detail-1"></div></div>
+            <div class="step" data-step="2"><div class="step-num"><span>03</span><span class="step-dot"></span></div><div class="step-name">Structuring</div><div class="step-detail" id="detail-2"></div></div>
+            <div class="step" data-step="3"><div class="step-num"><span>04</span><span class="step-dot"></span></div><div class="step-name">Confidence Scoring</div><div class="step-detail" id="detail-3"></div></div>
+          </div>
+          <div class="event-log" id="event-log"></div>
+        </div>
+
+        <div class="panel" id="output-panel">
+          <div class="empty-state" id="empty-state">
+            <div class="glyph">···</div>
+            <p>No run yet. Fill in the query on the left and run enrichment, or load the sample result to see the output format.</p>
+          </div>
+          <div id="result-content" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-compare">
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="panel-head"><span>Product Queue</span><span id="queue-count">3 items</span></div>
+      <div class="queue-list" id="queue-list"></div>
+      <div class="queue-actions">
+        <button class="btn btn-small btn-ghost" id="add-row-btn" style="width:auto;">+ Add product</button>
+        <button class="btn btn-small" id="run-queue-btn" style="width:auto;">Run all</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span>Comparison</span><span id="compare-status">idle</span></div>
+      <div class="compare-grid" id="compare-grid">
+        <div class="empty-state" style="grid-column:1/-1;">
+          <div class="glyph">···</div>
+          <p>Run the queue above — cards populate here as each product finishes. Click a card to see its full field breakdown below.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="compare-detail-panel" style="margin-top:20px;display:none;">
+      <div id="compare-detail-content"></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="legend">
+      <span><span class="led high"></span> High confidence — ships as-is</span>
+      <span><span class="led medium"></span> Medium — usable, spot-check</span>
+      <span><span class="led low"></span> Low — flagged for review</span>
+    </div>
+    <div>SOURCE AUTHORITY: manufacturer &gt; datasheet &gt; distributor &gt; general web</div>
+  </footer>
+
+</div>
+
+<script>
+const SAMPLE = {
+  mpn: "LM358P", brand: "Texas Instruments",
+  category: { value: "Operational Amplifiers", confidence: 0.91, confidence_band: "high", sources: ["https://www.ti.com/product/LM358"], needs_review: false, breakdown:{source_authority:0.95, agreement_bonus:1.0, method_bonus:1.0, conflicting_sources:false, contributing_sources:1} },
+  title: { value: "LM358P Dual Operational Amplifier, DIP-8", confidence: 0.88, confidence_band: "high", sources: ["https://www.ti.com/product/LM358","https://www.mouser.com/ProductDetail/LM358P"], needs_review: false, breakdown:{source_authority:0.83, agreement_bonus:1.0, method_bonus:1.0, conflicting_sources:false, contributing_sources:2} },
+  description: { value: "Dual operational amplifier", confidence: 0.6, confidence_band: "medium", sources: ["user_input"], needs_review: false, breakdown:{source_authority:0.3, agreement_bonus:0.5, method_bonus:1.0, conflicting_sources:false, contributing_sources:1} },
+  specifications: {
+    supply_voltage: { value: "3V to 32V", confidence: 0.85, confidence_band: "high", sources: ["https://www.ti.com/lit/ds/symlink/lm358.pdf"], needs_review: false, breakdown:{source_authority:0.85, agreement_bonus:0.5, method_bonus:0.9, conflicting_sources:false, contributing_sources:1} },
+    package: { value: "PDIP-8", confidence: 0.78, confidence_band: "high", sources: ["https://www.ti.com/lit/ds/symlink/lm358.pdf","https://www.mouser.com/ProductDetail/LM358P"], needs_review: false, breakdown:{source_authority:0.78, agreement_bonus:1.0, method_bonus:0.95, conflicting_sources:false, contributing_sources:2} },
+    operating_temperature: { value: "0C to 70C", confidence: 0.4, confidence_band: "low", sources: ["https://www.mouser.com/ProductDetail/LM358P"], needs_review: true, breakdown:{source_authority:0.3, agreement_bonus:0.5, method_bonus:0.6, conflicting_sources:false, contributing_sources:1} }
+  },
+  images: ["https://www.ti.com/images/products/lm358_package.png"],
+  sources_used: [
+    { url: "https://www.ti.com/lit/ds/symlink/lm358.pdf", title: "LM358 Dual Operational Amplifiers Datasheet", source_type: "pdf_datasheet", authority_score: 0.85 },
+    { url: "https://www.ti.com/product/LM358", title: "LM358 Product Page - Texas Instruments", source_type: "manufacturer_page", authority_score: 0.95 },
+    { url: "https://www.mouser.com/ProductDetail/LM358P", title: "LM358P | Mouser Electronics", source_type: "distributor_listing", authority_score: 0.7 }
+  ],
+  category_matched_taxonomy: true,
+  extraction_stats: { sources_attempted: 4, sources_succeeded: 3, sources_failed: 1, failed_urls: ["https://randomdistributor.example/lm358p"] },
+  overall_confidence: 0.74, review_flagged_fields: ["operating_temperature"]
+};
+
+const SAMPLE_QUEUE_SEED = [
+  { mpn: "LM358P", brand: "Texas Instruments", description: "Dual operational amplifier" },
+  { mpn: "ERJ-3EKF1001V", brand: "Panasonic", description: "1kOhm chip resistor" },
+  { mpn: "0603YC104KAT2A", brand: "AVX", description: "100nF ceramic capacitor" },
+];
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+function band(f){ return f.confidence_band; }
+function pct(f){ return Math.round(f.confidence*100)+'%'; }
+function gaugeColor(v){ if(v>=0.75) return 'var(--sig-high)'; if(v>=0.45) return 'var(--sig-med)'; return 'var(--sig-low)'; }
+
+function renderSourceLinks(urls){
+  if(!urls || !urls.length) return '';
+  return `<div class="source-links">${urls.map(u => u==='user_input' ? `<span>user input</span>` : `<a href="${u}" target="_blank" rel="noopener">${safeHost(u)}</a>`).join('')}</div>`;
+}
+function safeHost(u){ try{ return new URL(u).hostname; }catch(e){ return u; } }
+
+function renderBreakdownTip(f){
+  const b = f.breakdown || {};
+  return `<div class="breakdown-tip">
+    <div class="row"><span>source authority</span><b>${Math.round((b.source_authority||0)*100)}%</b></div>
+    <div class="row"><span>agreement</span><b>${Math.round((b.agreement_bonus||0)*100)}%</b></div>
+    <div class="row"><span>method quality</span><b>${Math.round((b.method_bonus||0)*100)}%</b></div>
+    <div class="row"><span>sources used</span><b>${b.contributing_sources||0}</b></div>
+    ${b.conflicting_sources ? '<div class="flag">⚠ sources disagreed — highest-authority value kept</div>' : ''}
+  </div>`;
+}
+
+let rowCounter = 0;
+function renderFieldRow(key, field){
+  const b = band(field);
+  const val = field.value ? escapeHtml(field.value) : '<span class="none">not found</span>';
+  const delay = (rowCounter++ * 45);
+  return `
+    <div class="field-row" style="animation-delay:${delay}ms;">
+      <div class="led ${b}"></div>
+      <div class="field-key">${key.replace(/_/g,' ')}</div>
+      <div class="field-val">
+        ${val}
+        ${renderSourceLinks(field.sources)}
+        ${field.needs_review ? '<div class="review-tag">Needs review</div>' : ''}
+      </div>
+      <div class="field-meta" onclick="this.classList.toggle('tip-open')">
+        <div class="conf-pct ${b}">${pct(field)}</div>
+        ${renderBreakdownTip(field)}
+      </div>
+    </div>`;
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function renderFullResult(data){
+  rowCounter = 0;
+  const oc = data.overall_confidence;
+  const color = gaugeColor(oc);
+  let html = `
+    <div class="result-head">
+      <div class="result-title">
+        <h2>${data.title && data.title.value ? escapeHtml(data.title.value) : data.mpn}</h2>
+        <div class="mpn-tag">MPN ${data.mpn} · ${data.brand}${data.category_matched_taxonomy === false ? ' · <span style="color:var(--sig-med)">category not in fixed taxonomy</span>' : ''}</div>
+      </div>
+      <div class="gauge">
+        <div>
+          <div class="gauge-label" style="text-align:right;">Overall confidence</div>
+          <div class="conf-pct" style="font-size:20px;color:${color};text-align:right;border:none;">${Math.round(oc*100)}%</div>
+        </div>
+        <div class="gauge-ring" style="border:3px solid ${color};color:${color};box-shadow:0 0 14px ${color}55;">${Math.round(oc*100)}</div>
+      </div>
+    </div>
+    <div class="field-list">
+      ${renderFieldRow('category', data.category)}
+      ${renderFieldRow('title', data.title)}
+      ${renderFieldRow('description', data.description)}
+      ${Object.entries(data.specifications||{}).map(([k,f]) => renderFieldRow(k,f)).join('')}
+    </div>
+  `;
+  if(data.images && data.images.length){
+    html += `<div class="section-label">Images</div><div class="images-strip">${data.images.map(u=>`<img src="${u}" alt="" onerror="this.style.display='none'">`).join('')}</div>`;
+  }
+  const stats = data.extraction_stats;
+  html += `<div class="section-label">Sources consulted (${(data.sources_used||[]).length})${stats ? ` — ${stats.sources_succeeded}/${stats.sources_attempted} yielded data` : ''}</div>`;
+  if(stats && stats.sources_failed > 0){
+    html += `<div style="padding:0 18px 10px;font-family:var(--font-mono);font-size:11px;color:var(--sig-med);">⚠ ${stats.sources_failed} source(s) failed or returned nothing: ${stats.failed_urls.map(safeHost).join(', ')}</div>`;
+  }
+  html += `<table class="sources-table"><tbody>
+    ${(data.sources_used||[]).map(s => `
+      <tr>
+        <td>${s.source_type.replace(/_/g,' ')}</td>
+        <td><a href="${s.url}" target="_blank" rel="noopener">${escapeHtml(s.title || s.url)}</a>
+          <span class="auth-bar"><span style="width:${Math.round(s.authority_score*100)}%"></span></span>
+        </td>
+      </tr>`).join('')}
+    </tbody></table>`;
+  return html;
+}
+
+const stepperEl = document.getElementById('stepper');
+const steps = [...stepperEl.querySelectorAll('.step')];
+const emptyState = document.getElementById('empty-state');
+const resultContent = document.getElementById('result-content');
+const runBtn = document.getElementById('run-btn');
+const demoBtn = document.getElementById('demo-btn');
+const modeIndicator = document.getElementById('mode-indicator');
+const panelStatusDot = document.getElementById('panel-status-dot');
+const eventLog = document.getElementById('event-log');
+
+const STAGE_INDEX = { retrieval:0, extraction:1, structuring:2, scoring:3 };
+
+function resetStepper(){
+  steps.forEach(s => { s.classList.remove('active','done','error'); });
+  [0,1,2,3].forEach(i => document.getElementById('detail-'+i).textContent = '');
+  eventLog.innerHTML = ''; eventLog.classList.remove('visible');
+}
+function setStep(i, state, detail){
+  steps[i].classList.remove('active','done','error');
+  steps[i].classList.add(state);
+  if(detail !== undefined) document.getElementById('detail-'+i).textContent = detail;
+}
+function logEvent(text){
+  eventLog.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = 'ev';
+  line.innerHTML = `<span class="t">&gt;</span>${escapeHtml(text)}`;
+  eventLog.appendChild(line);
+  eventLog.scrollTop = eventLog.scrollHeight;
+}
+
+async function animateStepperDemo(){
+  resetStepper();
+  const labels = ['found 3 candidate sources','processed 3 source(s)','3 spec field(s) identified','overall confidence 74%'];
+  for(let i=0;i<steps.length;i++){
+    setStep(i,'active');
+    logEvent(i===0 ? 'searching manufacturer + distributor sources...' : 'working...');
+    await new Promise(r=>setTimeout(r, 420));
+    setStep(i,'done', labels[i]);
+  }
+}
+
+function renderError(msg){
+  resultContent.innerHTML = `<div class="error-state">RUN FAILED — ${escapeHtml(msg)}<br><br>No backend reachable at this URL, or the stream errored. Use "Load Sample Result" to preview the output format, or start the FastAPI server and try again.</div>`;
+  emptyState.style.display = 'none';
+  resultContent.style.display = 'block';
+}
+
+demoBtn.addEventListener('click', async () => {
+  modeIndicator.textContent = 'DEMO';
+  panelStatusDot.style.color = 'var(--sig-high)';
+  runBtn.disabled = true; demoBtn.disabled = true;
+  await animateStepperDemo();
+  resultContent.innerHTML = renderFullResult(SAMPLE);
+  emptyState.style.display = 'none'; resultContent.style.display = 'block';
+  runBtn.disabled = false; demoBtn.disabled = false;
+});
+
+runBtn.addEventListener('click', async () => {
+  const mpn = document.getElementById('mpn').value.trim();
+  const brand = document.getElementById('brand').value.trim();
+  const description = document.getElementById('description').value.trim();
+  const apiBase = document.getElementById('api-base').value.trim().replace(/\/$/,'');
+
+  if(!mpn || !brand){ renderError('MPN and brand are required.'); emptyState.style.display='none'; resultContent.style.display='block'; return; }
+
+  modeIndicator.textContent = 'LIVE';
+  panelStatusDot.style.color = 'var(--accent)';
+  runBtn.disabled = true; demoBtn.disabled = true;
+  resetStepper();
+  emptyState.style.display = 'none'; resultContent.style.display = 'none';
+
+  try{
+    await streamEnrichment(apiBase, {mpn, brand, description}, {
+      onCacheHit: () => {
+        [0,1,2,3].forEach(i => setStep(i, 'done', 'cached'));
+      },
+      onStageStart: (stage) => setStep(STAGE_INDEX[stage], 'active'),
+      onStageDone: (stage, detail) => setStep(STAGE_INDEX[stage], 'done', detail),
+      onLog: (text) => logEvent(text),
+      onResult: (data) => {
+        resultContent.innerHTML = renderFullResult(data);
+        resultContent.style.display = 'block';
+      },
+      onError: (msg) => {
+        steps.forEach((s,i) => { if(s.classList.contains('active')) setStep(i,'error'); });
+        renderError(msg);
+      },
+    });
+  } catch(e){
+    renderError(e.message);
+  } finally {
+    runBtn.disabled = false; demoBtn.disabled = false;
+  }
+});
+
+async function streamEnrichment(apiBase, payload, handlers){
+  const resp = await fetch(`${apiBase}/enrich/stream`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  });
+  if(!resp.ok || !resp.body){
+    const errText = await resp.text().catch(()=> '');
+    throw new Error(`HTTP ${resp.status} ${errText.slice(0,200)}`);
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while(true){
+    const {done, value} = await reader.read();
+    if(done) break;
+    buffer += decoder.decode(value, {stream:true});
+    const events = buffer.split('\n\n');
+    buffer = events.pop();
+
+    for(const raw of events){
+      if(!raw.trim()) continue;
+      const lines = raw.split('\n');
+      let eventType = 'message', data = '';
+      for(const line of lines){
+        if(line.startsWith('event: ')) eventType = line.slice(7).trim();
+        if(line.startsWith('data: ')) data = line.slice(6);
+      }
+      let payload;
+      try{ payload = JSON.parse(data); } catch(e){ continue; }
+
+      if(eventType === 'cache_hit'){
+        handlers.onCacheHit(payload.detail);
+        handlers.onLog(`⚡ ${payload.detail}`);
+      } else if(eventType === 'stage_start'){
+        handlers.onStageStart(payload.stage);
+        handlers.onLog(`${payload.stage} started`);
+      } else if(eventType === 'stage_done'){
+        handlers.onStageDone(payload.stage, payload.detail);
+        handlers.onLog(`${payload.stage} done — ${payload.detail}`);
+      } else if(eventType === 'source_extracting'){
+        handlers.onLog(`reading ${payload.type.replace(/_/g,' ')}: ${safeHost(payload.url)}`);
+      } else if(eventType === 'source_extracted'){
+        handlers.onLog(`  → ${payload.fields_found} field(s) found`);
+      } else if(eventType === 'result'){
+        handlers.onResult(payload);
+      } else if(eventType === 'error'){
+        handlers.onError(payload.message);
+      }
+    }
+  }
+}
+
+let queue = JSON.parse(JSON.stringify(SAMPLE_QUEUE_SEED));
+let compareResults = {};
+
+function renderQueue(){
+  const list = document.getElementById('queue-list');
+  document.getElementById('queue-count').textContent = `${queue.length} item${queue.length===1?'':'s'}`;
+  list.innerHTML = queue.map((q,i) => `
+    <div class="queue-row">
+      <input type="text" placeholder="MPN" value="${escapeHtml(q.mpn)}" oninput="queue[${i}].mpn=this.value">
+      <input type="text" placeholder="Brand" value="${escapeHtml(q.brand)}" oninput="queue[${i}].brand=this.value">
+      <input type="text" placeholder="Description" value="${escapeHtml(q.description)}" oninput="queue[${i}].description=this.value">
+      <button class="queue-remove" onclick="removeQueueRow(${i})">✕</button>
+    </div>
+  `).join('');
+}
+function removeQueueRow(i){ queue.splice(i,1); renderQueue(); }
+document.getElementById('add-row-btn').addEventListener('click', () => {
+  queue.push({mpn:'', brand:'', description:''});
+  renderQueue();
+});
+renderQueue();
+
+function compareCardHtml(i, q, state){
+  const status = state.status || 'pending';
+  let confHtml = '<span style="color:var(--text-dim)">—</span>';
+  let barWidth = 0, barColor = 'var(--grid-line)', flagsHtml = '';
+  if(state.data){
+    const oc = state.data.overall_confidence;
+    const color = gaugeColor(oc);
+    confHtml = `<span style="color:${color}">${Math.round(oc*100)}%</span>`;
+    barWidth = Math.round(oc*100); barColor = color;
+    const flags = state.data.review_flagged_fields || [];
+    flagsHtml = flags.length ? `${flags.length} field(s) flagged for review` : 'no fields flagged';
+  }
+  const statusLabel = status === 'error' ? 'error' : status;
+  return `
+    <div class="compare-card" data-idx="${i}" onclick="selectCompareCard(${i})">
+      <div class="cc-head">
+        <div>
+          <div class="cc-mpn">${escapeHtml(q.mpn || '(no mpn)')}</div>
+          <div class="cc-brand">${escapeHtml(q.brand || '')}</div>
+        </div>
+        <div class="cc-status">${statusLabel}</div>
+      </div>
+      <div class="cc-conf">${confHtml}</div>
+      <div class="cc-flags">${state.error ? escapeHtml(state.error) : flagsHtml}</div>
+      <div class="cc-bar"><span style="width:${barWidth}%;background:${barColor};"></span></div>
+    </div>`;
+}
+
+function renderCompareGrid(){
+  const grid = document.getElementById('compare-grid');
+  if(queue.length === 0){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="glyph">···</div><p>Add products to the queue above.</p></div>`;
+    return;
+  }
+  grid.innerHTML = queue.map((q,i) => compareCardHtml(i, q, compareResults[i] || {})).join('');
+}
+
+function selectCompareCard(i){
+  document.querySelectorAll('.compare-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.compare-card[data-idx="${i}"]`);
+  if(card) card.classList.add('selected');
+  const state = compareResults[i];
+  const panel = document.getElementById('compare-detail-panel');
+  const content = document.getElementById('compare-detail-content');
+  if(!state || !state.data){
+    panel.style.display = 'none';
+    return;
+  }
+  rowCounter = 0;
+  content.innerHTML = renderFullResult(state.data);
+  panel.style.display = 'block';
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+document.getElementById('run-queue-btn').addEventListener('click', async () => {
+  const apiBase = document.getElementById('api-base').value.trim().replace(/\/$/,'') || 'http://localhost:8000';
+  const runBtnQ = document.getElementById('run-queue-btn');
+  const statusEl = document.getElementById('compare-status');
+  runBtnQ.disabled = true;
+  compareResults = {};
+  queue.forEach((_,i) => compareResults[i] = {status:'pending'});
+  renderCompareGrid();
+
+  for(let i=0;i<queue.length;i++){
+    const q = queue[i];
+    if(!q.mpn || !q.brand){ compareResults[i] = {status:'error', error:'missing mpn/brand'}; renderCompareGrid(); continue; }
+    compareResults[i] = {status:'running'};
+    statusEl.textContent = `running ${i+1}/${queue.length}`;
+    renderCompareGrid();
+    try{
+      let finalData = null;
+      await streamEnrichment(apiBase, q, {
+        onCacheHit: () => {},
+        onStageStart: () => {},
+        onStageDone: () => {},
+        onLog: () => {},
+        onResult: (data) => { finalData = data; },
+        onError: (msg) => { throw new Error(msg); },
+      });
+      compareResults[i] = {status:'done', data: finalData};
+    } catch(e){
+      compareResults[i] = {status:'error', error: e.message.slice(0,60)};
+    }
+    renderCompareGrid();
+  }
+  statusEl.textContent = 'idle';
+  runBtnQ.disabled = false;
+});
+</script>
+</body>
+</html>

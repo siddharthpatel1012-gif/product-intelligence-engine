@@ -1,0 +1,73 @@
+{
+  "mpn": "LM358P",
+  "brand": "Texas Instruments",
+  "category": {
+    "value": "Operational Amplifiers",
+    "confidence": 0.91,
+    "confidence_band": "high",
+    "sources": ["https://www.ti.com/product/LM358"],
+    "needs_review": false
+  },
+  "title": {
+    "value": "LM358P Dual Operational Amplifier, DIP-8",
+    "confidence": 0.88,
+    "confidence_band": "high",
+    "sources": ["https://www.ti.com/product/LM358", "https://www.mouser.com/ProductDetail/LM358P"],
+    "needs_review": false
+  },
+  "description": {
+    "value": "Dual operational amplifier",
+    "confidence": 0.6,
+    "confidence_band": "medium",
+    "sources": ["user_input"],
+    "needs_review": false
+  },
+  "specifications": {
+    "supply_voltage": {
+      "value": "3V to 32V",
+      "confidence": 0.85,
+      "confidence_band": "high",
+      "sources": ["https://www.ti.com/lit/ds/symlink/lm358.pdf"],
+      "needs_review": false
+    },
+    "package": {
+      "value": "PDIP-8",
+      "confidence": 0.78,
+      "confidence_band": "high",
+      "sources": ["https://www.ti.com/lit/ds/symlink/lm358.pdf", "https://www.mouser.com/ProductDetail/LM358P"],
+      "needs_review": false
+    },
+    "operating_temperature": {
+      "value": "0C to 70C",
+      "confidence": 0.4,
+      "confidence_band": "low",
+      "sources": ["https://www.mouser.com/ProductDetail/LM358P"],
+      "needs_review": true
+    }
+  },
+  "images": [
+    "https://www.ti.com/images/products/lm358_package.png"
+  ],
+  "sources_used": [
+    {
+      "url": "https://www.ti.com/lit/ds/symlink/lm358.pdf",
+      "title": "LM358 Dual Operational Amplifiers Datasheet",
+      "source_type": "pdf_datasheet",
+      "authority_score": 0.85
+    },
+    {
+      "url": "https://www.ti.com/product/LM358",
+      "title": "LM358 Product Page - Texas Instruments",
+      "source_type": "manufacturer_page",
+      "authority_score": 0.95
+    },
+    {
+      "url": "https://www.mouser.com/ProductDetail/LM358P",
+      "title": "LM358P | Mouser Electronics",
+      "source_type": "distributor_listing",
+      "authority_score": 0.7
+    }
+  ],
+  "overall_confidence": 0.74,
+  "review_flagged_fields": ["operating_temperature"]
+}
