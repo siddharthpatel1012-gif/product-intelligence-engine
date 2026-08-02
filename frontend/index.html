@@ -335,6 +335,17 @@
 </div>
 
 <script>
+// If this page is being served BY the backend itself (e.g. deployed on
+// Render at the root URL), auto-fill the Backend URL field with the
+// current origin instead of the localhost default — so a judge who just
+// clicks the deployed link doesn't need to type anything to make it work.
+(function autoDetectBackendUrl(){
+  if(window.location.protocol.startsWith('http') && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'){
+    const field = document.getElementById('api-base');
+    if(field) field.value = window.location.origin;
+  }
+})();
+
 const SAMPLE = {
   mpn: "LM358P", brand: "Texas Instruments",
   category: { value: "Operational Amplifiers", confidence: 0.91, confidence_band: "high", sources: ["https://www.ti.com/product/LM358"], needs_review: false, breakdown:{source_authority:0.95, agreement_bonus:1.0, method_bonus:1.0, conflicting_sources:false, contributing_sources:1} },

@@ -1,7 +1,8 @@
 import json
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from app.schemas import ProductInput, EnrichedProduct
 from app.agents.orchestrator import run_pipeline, run_retrieval, build_candidates, run_scoring
 from app.agents.extraction_agent import extract_from_source
@@ -24,8 +25,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+FRONTEND_PATH = Path(__file__).resolve().parent.parent / "frontend" / "index.html"
 
-@app.get("/")
+
+@app.get("/", response_class=HTMLResponse)
+def serve_frontend():
+    """
+    Serves the dashboard directly at the root URL, so the deployed link
+    (e.g. https://your-app.onrender.com) shows the actual product instead
+    of a bare JSON health check. Falls back to the JSON health check if
+    the frontend file isn't found (e.g. in an environment that only ships
+    the backend).
+    """
+    if FRONTEND_PATH.exists():
+        return FileResponse(FRONTEND_PATH)
+    return {"status": "ok", "service": "product-intelligence-engine"}
+
+
+@app.get("/api/health")
 def health():
     return {"status": "ok", "service": "product-intelligence-engine"}
 
