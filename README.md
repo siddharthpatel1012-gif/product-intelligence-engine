@@ -1,4 +1,4 @@
-# Product Intelligence Engine — UniHack (Unilog Challenge)
+# Product Intelligence Engine 
 
 Turns minimal input (MPN + brand + one-line description) into rich,
 structured, commerce-ready product data — with a confidence score on
