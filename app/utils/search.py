@@ -91,6 +91,12 @@ def build_queries(mpn: str, brand: str, description: str) -> list[str]:
     queries = more distinct candidate sources = better odds that at
     least a few actually yield extractable data (some sites 403 bots,
     some pages are thin — casting a wider net compensates for that).
+
+    The site:octopart.com and site:findchips.com queries specifically
+    target aggregator sites that, in testing, were far less likely to
+    403 the scraper than direct distributor sites like Digi-Key or
+    Newark — they consistently ranked as some of the highest-yield
+    sources across every tested product category.
     """
     brand_domain = brand.lower().replace(" ", "").replace(".", "")
     return [
@@ -99,6 +105,8 @@ def build_queries(mpn: str, brand: str, description: str) -> list[str]:
         f'{brand} {mpn} {description}',
         f'"{mpn}" site:{brand_domain}.com',
         f'"{mpn}" datasheet pdf',
+        f'"{mpn}" site:octopart.com',
+        f'"{mpn}" site:findchips.com',
         f'"{mpn}" buy distributor',
         f'"{mpn}" {brand} datasheet -filetype:pdf',
     ]

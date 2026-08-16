@@ -10,7 +10,14 @@ from app.utils.search import web_search, build_queries
 from app import config
 
 
-DISTRIBUTOR_DOMAINS = ["digikey", "mouser", "grainger", "mcmaster", "rs-online", "farnell"]
+# octopart and findchips added: aggregator sites that, in testing,
+# were far less likely to block scraping than direct distributor sites
+# (Digi-Key, Newark) and consistently yielded good data across every
+# tested product category.
+DISTRIBUTOR_DOMAINS = [
+    "digikey", "mouser", "grainger", "mcmaster", "rs-online", "farnell",
+    "octopart", "findchips",
+]
 
 
 def _authority_score(url: str, brand: str) -> float:
