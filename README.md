@@ -1,9 +1,13 @@
-# Product Intelligence Engine 
+# Product Intelligence Engine — UniHack (Unilog Challenge)
 
 Turns minimal input (MPN + brand + one-line description) into rich,
 structured, commerce-ready product data — with a confidence score on
 every field so downstream systems know what to trust and what needs
 human review.
+
+🔗 **Live demo:** https://product-intelligence-engine.onrender.com
+(Free-tier hosting — if it's been idle, the first request may take
+30-60 seconds to wake up.)
 
 **Third-party APIs / AI tools used:** Google Gemini API (extraction,
 vision-based datasheet reading, product-category classification —
@@ -12,8 +16,8 @@ with automatic fallback to Tavily if configured. The project also
 supports Anthropic's Claude API as a swappable alternative (see
 `LLM_PROVIDER` in `.env`), but Gemini is the tested, working default.
 
-**Status: tested end-to-end with live APIs on 6 real, different
-products** across 6 different categories — see "Tested results" below.
+**Status: tested end-to-end with live APIs on 9 real, different
+products** across 9 different categories — see "Tested results" below.
 
 ## Problem & approach
 
@@ -22,7 +26,7 @@ have any data, go find the rest, and prove how sure you are." That
 splits into three honest steps, and the pipeline mirrors them 1:1:
 
 1. **Retrieval** — the input alone isn't enough. An agent searches the
-   web (7 targeted query variants per product, with automatic fallback
+   web (9 targeted query variants per product, with automatic fallback
    to a second search provider) for manufacturer pages, distributor
    listings, and datasheet PDFs for the given MPN/brand.
 2. **Extraction** — the good data (dimensions, materials, certs,
@@ -49,9 +53,9 @@ enrichment demos skip, and it's the thing this project leads with.
           │
           ▼
  ┌─────────────────┐
- │ Retrieval Agent  │  → web search (7 query variants, dual-provider
+ │ Retrieval Agent  │  → web search (9 query variants, dual-provider
  └────────┬─────────┘     fallback), manufacturer site, distributor
-          │                listings, datasheet PDFs
+          │                listings, datasheet PDFs, aggregator sites
           │  candidate sources (URLs, PDFs)
           ▼
  ┌─────────────────┐
@@ -78,7 +82,7 @@ enrichment demos skip, and it's the thing this project leads with.
 ## Tested results
 
 Run live end-to-end (real search + real LLM calls, no mocking) across
-six genuinely different product categories to confirm the pipeline
+nine genuinely different product categories to confirm the pipeline
 generalizes rather than working by luck on one example:
 
 | MPN | Brand | Category | Sources succeeded | Spec fields found | Overall confidence |
@@ -89,15 +93,19 @@ generalizes rather than working by luck on one example:
 | 1-1734248-1 | TE Connectivity | Connectors | 4/5 | 65 | 79% |
 | SN7400N | Texas Instruments | Logic ICs | 4/5 | 18 | 78% |
 | 24LC256-I/P | Microchip | Memory ICs | 2/5 | 9 | 81% |
+| EVQ-11L05K | Panasonic | Switches & Relays | 2/5 | 8 | 82% |
 
 Category was correctly classified against the fixed taxonomy in every
 run (no false "Uncategorized"). Sources that failed or returned
 nothing are tracked and surfaced, not silently dropped (see
-`extraction_stats` in the response / the ⚠ warning in the UI). The
-LM358P run above (5/5 sources, 32 fields) used the improved 7-query
-retrieval — an earlier run with the original 4-query retrieval only
-reached 3/5 sources and 21 fields on the identical product, which is
-the direct, measured effect of that improvement.
+`extraction_stats` in the response / the ⚠ warning in the UI).
+
+The LM358P row above reflects the improved retrieval query set (9
+queries, including targeted `site:octopart.com` / `site:findchips.com`
+searches) — an earlier run with the original 4-query retrieval only
+reached 3/5 sources and 21 fields on the identical product. A later
+re-run after that improvement reached a full 5/5 sources and 31-32
+fields, which is the direct, measured effect of that change.
 
 ## Design decisions & why
 
@@ -139,6 +147,16 @@ from the input alone (common — most datasheets don't literally say
 "Category: X"), that's scored as a moderate-confidence success, not a
 failure.
 
+**Why Gemini instead of Claude, given this project is for a
+Claude/Anthropic-adjacent audience?**
+Purely practical: Anthropic's API requires a paid credit balance (even
+a small one, ~$5) before any call succeeds — there's no ongoing free
+tier. Gemini has a genuinely free daily quota, which is what actually
+let this get built and tested end-to-end without a payment blocker.
+The code supports both (`LLM_PROVIDER=anthropic|gemini` in `.env`,
+see `app/agents/llm_client.py`) — switching back to Claude is a one-line
+config change, not a rewrite, if credits are available.
+
 **What happens if the same product is looked up twice?**
 The second lookup is served instantly from an in-memory cache (keyed
 on MPN+brand, 1-hour TTL) — no repeat API calls, no repeat cost. This
@@ -149,12 +167,13 @@ is visible in the UI: the pipeline stepper shows all four stages as
 
 ```
 app/
-  main.py                 FastAPI entrypoint — POST /enrich, POST /enrich/stream (SSE), CORS enabled, caching
+  main.py                 FastAPI entrypoint — serves the dashboard at "/", POST /enrich,
+                           POST /enrich/stream (SSE), CORS enabled, caching
   config.py                API keys / settings
   schemas.py               Pydantic models (input, enriched output, confidence + breakdown)
   agents/
     orchestrator.py        Pipeline stages as standalone functions (retrieval, extraction, structuring, scoring)
-    retrieval_agent.py      Web search + candidate source ranking
+    retrieval_agent.py      Web search + candidate source ranking (includes aggregator-site authority weighting)
     extraction_agent.py     HTML/PDF text extraction → LLM for structuring
     vlm_agent.py             Vision fallback for scanned datasheets/spec images
     taxonomy_agent.py        Classifies category against a fixed 38-category product taxonomy
@@ -170,6 +189,7 @@ data/
 frontend/
   index.html                Standalone dashboard: single lookup (live SSE progress, cache-hit indicator)
                              + batch compare (queue of products, side-by-side cards)
+                             Also served directly by the backend at the deployed root URL.
 tests/
   test_confidence.py         Unit tests for the scoring logic (no API calls)
   test_extraction_stats.py   Unit tests for failure-tracking bookkeeping (no API calls)
@@ -177,8 +197,10 @@ tests/
 
 ## Frontend
 
-`frontend/index.html` is a standalone dashboard — open it directly in a
-browser, no build step. Two views:
+The dashboard is served directly at the deployed root URL (see "Live
+demo" above) — no separate setup needed to view it. It's also a
+standalone file (`frontend/index.html`) you can open directly in a
+browser with no build step. Two views:
 
 - **Single Lookup** — enter one MPN/brand/description, watch the four
   pipeline stages update live as the backend streams real progress
@@ -203,9 +225,9 @@ copy .env.example .env         # Windows; use `cp .env.example .env` on Mac/Linu
 ```
 
 Fill in `.env` with:
-- `GEMINI_API_KEY` 
-- `SERPER_API_KEY` 
-- `TAVILY_API_KEY` 
+- `GEMINI_API_KEY` — free at [aistudio.google.com](https://aistudio.google.com), no card needed
+- `SERPER_API_KEY` — free at [serper.dev](https://serper.dev)
+- `TAVILY_API_KEY` — optional, free at [tavily.com](https://tavily.com); enables automatic search fallback if Serper fails
 
 Leave `LLM_PROVIDER=gemini` and `GEMINI_MODEL=gemini-3.1-flash-lite` as
 the defaults — this is the exact configuration tested above. **Note:**
@@ -222,9 +244,8 @@ Then run:
 uvicorn app.main:app --reload
 ```
 
-Open `frontend/index.html` directly in a browser (double-click it —
-no server needed for the frontend itself), or hit the API from the
-command line:
+Visit `http://localhost:8000` in a browser — the dashboard is served
+directly at the root URL. Or hit the API from the command line:
 
 ```bash
 curl -X POST http://localhost:8000/enrich \
@@ -253,19 +274,30 @@ python3 tests/test_extraction_stats.py
   concurrently with `asyncio` is the natural next step.
 - **Cache is in-memory, single-process.** Fine for a demo/pilot; would
   need Redis (or similar) to work across multiple worker processes in
-  production.
+  production, and resets whenever the host restarts the process (e.g.
+  after idle spin-down on free hosting tiers).
 - **Gemini free-tier rate limits are real.** Each enrichment run makes
   5-10+ calls (one per source, plus taxonomy classification), so heavy
   back-to-back testing can hit short-term per-minute limits.
   `llm_client.py` retries automatically on rate-limit errors with
-  backoff, and repeat lookups are now served from cache instead of
+  backoff, and repeat lookups are served from cache instead of
   re-hitting the API at all.
 - **No knowledge-graph layer.** Substitute/similar-part linking was
   scoped out to keep the core (retrieval → extraction → structuring →
   confidence) solid rather than spreading thin across an optional
   stretch feature.
 - **Some manufacturer/distributor sites block scraping regardless of
-  User-Agent** (Digi-Key, Newark, and even manufacturer.com itself in
-  one test blocked requests) — a real, visible gap surfaced honestly
-  via `extraction_stats` rather than hidden. Didn't stop the pipeline
-  from succeeding overall since other sources filled in.
+  User-Agent** (Digi-Key, Newark, RS Online, and even manufacturer.com
+  itself in some tests blocked requests) — a real, visible gap
+  surfaced honestly via `extraction_stats` rather than hidden. Adding
+  `site:octopart.com` / `site:findchips.com` queries measurably
+  improved source-success rate since those aggregator sites are far
+  less aggressive about blocking scrapers than direct distributor
+  sites, but the underlying blocking on Digi-Key/Newark/RS specifically
+  is still unresolved.
+- **If deploying elsewhere:** some hosts (e.g. Render) now default to
+  very new Python versions (3.14+) that don't yet have pre-built
+  packages for a few pinned dependencies (`pydantic-core` in
+  particular), causing build failures. Fix: explicitly set
+  `PYTHON_VERSION=3.11.9` as an environment variable on the host —
+  that's the version this was actually built and tested against.
