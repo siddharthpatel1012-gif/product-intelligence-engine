@@ -8,6 +8,7 @@ fields as JSON. Falls back to the VLM agent when a PDF looks image-based
 """
 import json
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.schemas import SourceRef
 from app.utils.fetch import fetch_page_text, fetch_pdf_text, is_pdf_url
 from app.agents.vlm_agent import extract_from_pdf_images
@@ -86,4 +87,47 @@ def extract_from_source(source: SourceRef, mpn: str, brand: str) -> dict:
 
 
 def extract_from_all_sources(sources: list[SourceRef], mpn: str, brand: str) -> list[dict]:
+    """Sequential version — kept for reference/fallback. Prefer the
+    concurrent version below for actual use; this processes one source
+    at a time, which is much slower (the original bottleneck)."""
     return [extract_from_source(s, mpn, brand) for s in sources]
+
+
+def extract_from_all_sources_concurrent(
+    sources: list[SourceRef], mpn: str, brand: str, max_workers: int = 5
+) -> list[dict]:
+    """
+    Runs extraction for all sources IN PARALLEL using a thread pool,
+    instead of one at a time. This is the actual fix for slow enrichment
+    runs — each source's fetch+LLM-call was previously waited on fully
+    before the next one started, so 5 sources sequentially took roughly
+    5x as long as they needed to. Since each extraction is I/O-bound
+    (waiting on network requests and API responses, not CPU-bound work),
+    threads work well here despite Python's GIL — the GIL is released
+    during I/O waits, so this genuinely runs concurrently, not just
+    interleaved.
+
+    Returns results in the SAME ORDER as `sources` was given, even
+    though they may complete out of order internally — this keeps the
+    return value consistent with the old sequential version so nothing
+    downstream needs to change.
+    """
+    results: list[dict | None] = [None] * len(sources)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {
+            executor.submit(extract_from_source, source, mpn, brand): i
+            for i, source in enumerate(sources)
+        }
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            try:
+                results[index] = future.result()
+            except Exception as e:
+                # A single source's unexpected crash shouldn't take down
+                # the whole batch — record it as a failed extraction.
+                source = sources[index]
+                print(f"[extract] thread crashed for {source.url}: {e}")
+                data = _empty_result()
+                data["_error"] = str(e)
+                results[index] = {"source": source, "data": data}
+    return results

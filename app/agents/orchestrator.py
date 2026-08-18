@@ -7,7 +7,11 @@ Runs the pipeline: Retrieval -> Extraction (+VLM fallback) -> Structuring
 Kept as plain sequential Python (no agent framework) on purpose: it's
 transparent, easy to debug live during judging, and easy to defend —
 "here's exactly what happens at each step" beats a framework black box
-for a hackathon Q&A.
+for a hackathon Q&A. Extraction itself (stage 2) DOES run sources
+concurrently via a thread pool (see extraction_agent.extract_from_all_sources_concurrent)
+since that was a real, measured bottleneck — sequential extraction of
+5 sources took roughly 5x longer than it needed to, since each source's
+fetch + LLM call was fully waited on before the next one started.
 
 Each stage is its own function so `main.py` can call them one at a time
 and stream progress events between them (see /enrich/stream). The plain
@@ -16,7 +20,7 @@ non-streaming /enrich endpoint.
 """
 from app.schemas import ProductInput, EnrichedProduct, ScoredField, SourceRef, ExtractionStats
 from app.agents.retrieval_agent import find_sources
-from app.agents.extraction_agent import extract_from_source
+from app.agents.extraction_agent import extract_from_all_sources_concurrent
 from app.agents.confidence_agent import score_field, overall_confidence
 from app.agents.taxonomy_agent import classify_category
 
@@ -33,9 +37,11 @@ def run_retrieval(product_input: ProductInput) -> list[SourceRef]:
 
 
 def run_extraction(sources: list[SourceRef], product_input: ProductInput) -> list[dict]:
-    """Stage 2 (non-streaming — extracts all sources with no progress callback).
-    See main.py's stream generator for the per-source streaming version."""
-    return [extract_from_source(s, product_input.mpn, product_input.brand) for s in sources]
+    """Stage 2 — runs all sources concurrently (see extraction_agent.py).
+    Used by the non-streaming /enrich endpoint. The streaming endpoint
+    in main.py does its own concurrent extraction inline so it can emit
+    per-source progress events as each one finishes."""
+    return extract_from_all_sources_concurrent(sources, product_input.mpn, product_input.brand)
 
 
 def build_candidates(extractions: list[dict], product_input: ProductInput) -> dict:

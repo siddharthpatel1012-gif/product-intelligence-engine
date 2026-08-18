@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
@@ -70,8 +71,14 @@ def _stream_pipeline(product_input: ProductInput):
     an SSE event after each meaningful step so the frontend can show real
     progress instead of a canned animation.
 
-    Event types: cache_hit, stage_start, source_found, source_extracted,
-    stage_done, result, error.
+    Extraction (stage 2) now runs all sources CONCURRENTLY via a thread
+    pool instead of one at a time — this is the main speed fix. Progress
+    events for each source arrive as that source finishes, which may be
+    out of order (whichever source responds fastest reports first) —
+    that's expected and fine, the frontend just logs each as it arrives.
+
+    Event types: cache_hit, stage_start, source_extracting,
+    source_extracted, stage_done, result, error.
     """
     cached = cache.get(product_input.mpn, product_input.brand)
     if cached:
@@ -89,20 +96,40 @@ def _stream_pipeline(product_input: ProductInput):
             "sources": [s.url for s in sources],
         })
 
-        # Stage 2: Extraction (per-source events so the UI can show what's
-        # actively being read, not just a spinner)
+        # Stage 2: Extraction — CONCURRENT now, not sequential.
+        # All sources are submitted to a thread pool at once; we yield a
+        # "source_extracting" event for each up front (since they all
+        # start together), then a "source_extracted" event as each one
+        # actually finishes, in whatever order that happens.
         yield _sse("stage_start", {"stage": "extraction"})
-        extractions = []
         for source in sources:
             yield _sse("source_extracting", {"url": source.url, "type": source.source_type})
-            result = extract_from_source(source, product_input.mpn, product_input.brand)
-            extractions.append(result)
-            found_fields = sum([
-                1 if result["data"].get("title") else 0,
-                1 if result["data"].get("category") else 0,
-                len((result["data"].get("specifications") or {})),
-            ])
-            yield _sse("source_extracted", {"url": source.url, "fields_found": found_fields})
+
+        extractions: list[dict] = [None] * len(sources)
+        with ThreadPoolExecutor(max_workers=min(5, len(sources) or 1)) as executor:
+            future_to_index = {
+                executor.submit(extract_from_source, source, product_input.mpn, product_input.brand): i
+                for i, source in enumerate(sources)
+            }
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+                source = sources[index]
+                try:
+                    result = future.result()
+                except Exception as e:
+                    from app.agents.extraction_agent import _empty_result
+                    data = _empty_result()
+                    data["_error"] = str(e)
+                    result = {"source": source, "data": data}
+                extractions[index] = result
+
+                found_fields = sum([
+                    1 if result["data"].get("title") else 0,
+                    1 if result["data"].get("category") else 0,
+                    len((result["data"].get("specifications") or {})),
+                ])
+                yield _sse("source_extracted", {"url": source.url, "fields_found": found_fields})
+
         yield _sse("stage_done", {"stage": "extraction", "detail": f"processed {len(sources)} source(s)"})
 
         # Stage 3: Structuring
