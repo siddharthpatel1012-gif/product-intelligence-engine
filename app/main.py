@@ -1,13 +1,22 @@
+import io
 import json
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from app.schemas import ProductInput, EnrichedProduct
 from app.agents.orchestrator import run_pipeline, run_retrieval, build_candidates, run_scoring
 from app.agents.extraction_agent import extract_from_source
 from app.utils import cache
+from app.batch.headers import EXPECTED_HEADERS
+from app.batch.row_mapper import build_product_input, map_row_to_headers
+from app.batch.file_io import read_input_file, write_xlsx_bytes
+
+# Batch runs are gated to a sane size for a hackathon demo on free-tier
+# LLM/search quotas — each row costs several API calls. Raise this once
+# paid keys / higher quotas are in place for a real evaluation run.
+MAX_BATCH_ROWS = 25
 
 app = FastAPI(
     title="UniHack Product Intelligence Engine",
@@ -167,4 +176,62 @@ def enrich_stream(product_input: ProductInput):
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",  # disable nginx buffering if deployed behind it
         },
+    )
+
+
+@app.post("/enrich/batch-file")
+async def enrich_batch_file(file: UploadFile = File(...)):
+    """
+    Takes an uploaded CSV/XLSX of raw catalogue rows (Mfg_Part_Num,
+    Part_Desc, E1_Brand, Unilog_Brand, DIB_Brand, Part_Manuf — the
+    Sample-1000/200-item schema), runs each row through the same
+    four-stage pipeline as /enrich, and returns a single XLSX with
+    every row mapped into the exact fixed Expected Output headers.
+
+    A row that fails (no MPN, retrieval error, etc.) still gets a row
+    in the output — with as many fields populated as could be, an
+    error note in LONG_DESC1, and everything else left blank — rather
+    than silently dropping it, so partial failures stay visible.
+    """
+    content = await file.read()
+    try:
+        raw_rows = read_input_file(content, file.filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not raw_rows:
+        raise HTTPException(status_code=400, detail="No rows found in the uploaded file.")
+    if len(raw_rows) > MAX_BATCH_ROWS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{len(raw_rows)} rows uploaded, but batch runs are capped at "
+                f"{MAX_BATCH_ROWS} rows per request (free-tier API quota). "
+                f"Split the file into smaller batches."
+            ),
+        )
+
+    output_rows: list[dict] = []
+    for raw_row in raw_rows:
+        try:
+            product_input = build_product_input(raw_row)
+            cached = cache.get(product_input.mpn, product_input.brand)
+            if cached:
+                enriched = EnrichedProduct(**cached)
+            else:
+                enriched = run_pipeline(product_input)
+                cache.set(product_input.mpn, product_input.brand, json.loads(enriched.model_dump_json()))
+            output_rows.append(map_row_to_headers(raw_row, enriched))
+        except Exception as e:
+            error_row = {h: "" for h in EXPECTED_HEADERS}
+            error_row["Mfg_Part_Num"] = str(raw_row.get("Mfg_Part_Num", ""))
+            error_row["Part_Desc"] = str(raw_row.get("Part_Desc", ""))
+            error_row["LONG_DESC1"] = f"ERROR: could not process this row — {e}"
+            output_rows.append(error_row)
+
+    xlsx_bytes = write_xlsx_bytes(output_rows, EXPECTED_HEADERS)
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=enriched_output.xlsx"},
     )
