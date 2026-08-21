@@ -67,7 +67,7 @@ def score_field(
     # Pick the group with the most (source_authority-weighted) support
     best_key = max(
         groups,
-        key=lambda k: sum(i["source"].authority_score for i in groups[k]),
+        key=lambda k: max(i["source"].authority_score for i in groups[k]),
     )
     winning_items = groups[best_key]
     display_value = winning_items[0]["value"]  # original casing

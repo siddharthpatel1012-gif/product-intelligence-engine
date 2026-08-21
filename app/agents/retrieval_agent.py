@@ -20,13 +20,20 @@ DISTRIBUTOR_DOMAINS = [
 ]
 
 
+import re
+
+def _brand_tokens(brand: str) -> list[str]:
+    return [t for t in re.split(r"[^a-z0-9]+", brand.lower()) if len(t) > 2]
+MARKETPLACE_DOMAINS = ["amazon", "ebay", "walmart", "toolnut", "acmetools"]
 def _authority_score(url: str, brand: str) -> float:
     url_lower = url.lower()
-    brand_token = brand.lower().replace(" ", "")
-    if brand_token and brand_token in url_lower:
-        return 0.95  # looks like the manufacturer's own domain
+    if any(tok in url_lower for tok in _brand_tokens(brand)):
+        return 0.95
     if url_lower.endswith(".pdf"):
         return 0.85  # datasheets are high-trust regardless of host
+            if any(d in url_lower for d in MARKETPLACE_DOMAINS):
+        return 0.15
+    return 0.4
     if any(d in url_lower for d in DISTRIBUTOR_DOMAINS):
         return 0.7
     return 0.4
