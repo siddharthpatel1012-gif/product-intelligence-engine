@@ -7,6 +7,7 @@ authority heuristic so downstream agents can weight sources sensibly.
 """
 
 import re
+from urllib.parse import urlparse
 
 from app.schemas import SourceRef
 from app.utils.search import web_search, build_queries
@@ -44,24 +45,34 @@ def _brand_tokens(brand: str) -> list[str]:
     ]
 
 
-def _authority_score(url: str, brand: str) -> float:
-    url_lower = url.lower()
+def _domain(url: str) -> str:
+    try:
+        return urlparse(url).netloc.lower()
+    except Exception:
+        return url.lower()
 
-    # Manufacturer/brand-specific pages are highly authoritative.
-    if any(token in url_lower for token in _brand_tokens(brand)):
+
+def _authority_score(url: str, brand: str) -> float:
+    domain = _domain(url)
+
+    # Manufacturer/brand-specific domains are highly authoritative.
+    # Checked against the domain only (not the full URL/path) so a
+    # distributor product page that merely mentions the brand name in
+    # its URL slug isn't mistaken for the manufacturer's own site.
+    if any(token in domain for token in _brand_tokens(brand)):
         return 0.95
 
     # PDF datasheets are generally high-trust sources.
-    if url_lower.endswith(".pdf"):
+    if url.lower().endswith(".pdf"):
         return 0.85
 
     # Marketplace listings are intentionally deprioritized.
-    if any(domain in url_lower for domain in MARKETPLACE_DOMAINS):
+    if any(d in domain for d in MARKETPLACE_DOMAINS):
         return 0.15
 
     # Distributor and aggregator listings are useful but below
     # manufacturer sources.
-    if any(domain in url_lower for domain in DISTRIBUTOR_DOMAINS):
+    if any(d in domain for d in DISTRIBUTOR_DOMAINS):
         return 0.7
 
     # Generic webpages receive the default score.
@@ -69,15 +80,15 @@ def _authority_score(url: str, brand: str) -> float:
 
 
 def _source_type(url: str, brand: str) -> str:
-    url_lower = url.lower()
+    domain = _domain(url)
 
-    if url_lower.endswith(".pdf"):
+    if url.lower().endswith(".pdf"):
         return "pdf_datasheet"
 
-    if brand.lower().replace(" ", "") in url_lower:
+    if any(token in domain for token in _brand_tokens(brand)):
         return "manufacturer_page"
 
-    if any(domain in url_lower for domain in DISTRIBUTOR_DOMAINS):
+    if any(d in domain for d in DISTRIBUTOR_DOMAINS):
         return "distributor_listing"
 
     return "webpage"
