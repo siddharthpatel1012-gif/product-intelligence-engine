@@ -73,10 +73,22 @@ def classify_category(mpn: str, brand: str, description: str, extracted_category
         print(f"[taxonomy] raw response: {raw!r}")
         cleaned = raw.replace("```json", "").replace("```", "").strip()
         result = json.loads(cleaned)
+
+        # If the model itself says it didn't find a confident match,
+        # always report "Uncategorized" — even if it still named an
+        # existing catch-all bucket like "Other Electronic Components".
+        # Previously a matched:false response could still display that
+        # bucket's name since it technically exists in TAXONOMY, which
+        # hid the low-confidence signal behind a plausible-looking label.
+        if not result.get("matched", True):
+            print(f"[taxonomy] model reported no confident match (category='{result.get('category')}') -> Uncategorized")
+            return {"category": "Uncategorized", "matched": False}
+
         if result.get("category") not in TAXONOMY:
             print(f"[taxonomy] category '{result.get('category')}' not in fixed list -> Uncategorized")
             return {"category": "Uncategorized", "matched": False}
-        return {"category": result["category"], "matched": bool(result.get("matched", True))}
+
+        return {"category": result["category"], "matched": True}
     except Exception as e:
         print(f"[taxonomy] ERROR: {e}")
         return {"category": "Uncategorized", "matched": False}
