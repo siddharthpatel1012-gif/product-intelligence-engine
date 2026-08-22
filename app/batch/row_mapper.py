@@ -20,6 +20,7 @@ invented value is a scoring risk.
 import re
 from app.schemas import ProductInput, EnrichedProduct, ScoredField
 from app.batch.headers import EXPECTED_HEADERS
+from app.batch.uom import normalize_value_uom
 
 PLACEHOLDER_VALUES = {
     "-- unbranded --", "-- no unilog brand --", "-- no dib brand --",
@@ -101,16 +102,21 @@ def _mobile_desc(brand: str, title: str) -> str:
     return text[:80].strip()
 
 
-_UNIT_SPLIT_RE = re.compile(r"^\s*([\d.\-/]+)\s*([A-Za-z°%]+)\s*$")
+_UNIT_SPLIT_RE = re.compile(r"^\s*([\d.\-/]+)\s*([A-Za-z°%\"'.]+)\s*$")
 
 
 def _split_value_uom(value: str) -> tuple[str, str]:
-    """'120 V' -> ('120', 'V'); 'Stainless Steel' -> ('Stainless Steel', '')."""
+    """'120 V' -> ('120', 'V'); 'Stainless Steel' -> ('Stainless Steel', '').
+    Also runs the result through normalize_value_uom() so the unit is
+    written the single approved way (space-separated, canonical
+    abbreviation) and inch measurements convert decimal -> fraction
+    per the content guidelines (0.5 -> 1/2, 50.25 -> 50-1/4)."""
     if not value:
         return "", ""
     m = _UNIT_SPLIT_RE.match(value.strip())
     if m:
-        return m.group(1), m.group(2)
+        raw_value, raw_uom = m.group(1), m.group(2)
+        return normalize_value_uom(raw_value, raw_uom)
     return value.strip(), ""
 
 
