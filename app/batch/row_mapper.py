@@ -130,7 +130,21 @@ def _find_spec(specs: dict[str, ScoredField], *keywords: str) -> str:
             return field.value
     return ""
 
+def _resolve_manufacturer_name(enriched: EnrichedProduct) -> str:
+    """Prefer a brand actually found via extraction (real source
+    evidence, scored) over the raw resolved-input-brand fallback,
+    when extraction found one with reasonable confidence.
 
+    This fixes a real case seen in testing: Part_Manuf sometimes holds
+    a distributor/co-op name rather than the true manufacturer (e.g.
+    input says "Appliance Dealers Cooperative", but the manufacturer's
+    own page — and extraction — correctly found "Frigidaire"). The
+    input-side value is a reasonable fallback when nothing better was
+    found, but shouldn't override genuine extracted evidence."""
+    extracted = enriched.specifications.get("brand") or enriched.specifications.get("manufacturer")
+    if extracted and extracted.value and extracted.confidence >= 0.45:
+        return extracted.value
+    return enriched.brand
 def map_row_to_headers(raw_row: dict, enriched: EnrichedProduct) -> dict:
     row: dict = {h: "" for h in EXPECTED_HEADERS}
 
@@ -151,9 +165,10 @@ def map_row_to_headers(raw_row: dict, enriched: EnrichedProduct) -> dict:
     for i, source in enumerate(ref_pool[:5], start=1):
         row[f"Ref URL {i}"] = source.url
 
-    # 3. Resolved identity fields.
-    row["MANUFACTURER_NAME"] = enriched.brand
-    row["BRAND_NAME"] = enriched.brand
+        # 3. Resolved identity fields.
+    manufacturer_name = _resolve_manufacturer_name(enriched)
+    row["MANUFACTURER_NAME"] = manufacturer_name
+    row["BRAND_NAME"] = manufacturer_name
     row["MANUFACTURER_PART_NUMBER"] = enriched.mpn
 
     # 4. Category / classpath (best-effort — this is the fixed-taxonomy
