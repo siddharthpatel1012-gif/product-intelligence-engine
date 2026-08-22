@@ -104,6 +104,12 @@ def _mobile_desc(brand: str, title: str) -> str:
 
 _UNIT_SPLIT_RE = re.compile(r"^\s*([\d.\-/]+)\s*([A-Za-z°%\"'.]+)\s*$")
 
+# "80G" grit sizing is a trade sizing designation, not a physical
+# length/weight unit — it must never go through the generic UOM
+# table, since a bare "G" there risks colliding with the gram alias
+# ("g") and mislabeling a grit value as a weight.
+_GRIT_RE = re.compile(r"^\s*(\d+)\s*[Gg]?\s*$")
+
 
 def _split_value_uom(value: str) -> tuple[str, str]:
     """'120 V' -> ('120', 'V'); 'Stainless Steel' -> ('Stainless Steel', '').
@@ -120,6 +126,18 @@ def _split_value_uom(value: str) -> tuple[str, str]:
     return value.strip(), ""
 
 
+def _split_value_uom_for_spec(spec_name: str, value: str) -> tuple[str, str]:
+    """Like _split_value_uom, but spec-name-aware: routes grit sizing
+    ('80G' -> ('80', 'Grit')) around the generic UOM table entirely,
+    instead of risking it being read as grams."""
+    if "grit" in spec_name.lower():
+        m = _GRIT_RE.match(value.strip())
+        if m:
+            return m.group(1), "Grit"
+        return value.strip(), ""
+    return _split_value_uom(value)
+
+
 def _find_spec(specs: dict[str, ScoredField], *keywords: str) -> str:
     """Case-insensitive substring lookup across spec field names —
     e.g. _find_spec(specs, 'upc') matches a spec literally named
@@ -129,6 +147,7 @@ def _find_spec(specs: dict[str, ScoredField], *keywords: str) -> str:
         if any(kw in lname for kw in keywords) and field.value:
             return field.value
     return ""
+
 
 def _resolve_manufacturer_name(enriched: EnrichedProduct) -> str:
     """Prefer a brand actually found via extraction (real source
@@ -145,6 +164,8 @@ def _resolve_manufacturer_name(enriched: EnrichedProduct) -> str:
     if extracted and extracted.value and extracted.confidence >= 0.45:
         return extracted.value
     return enriched.brand
+
+
 def map_row_to_headers(raw_row: dict, enriched: EnrichedProduct) -> dict:
     row: dict = {h: "" for h in EXPECTED_HEADERS}
 
@@ -165,7 +186,7 @@ def map_row_to_headers(raw_row: dict, enriched: EnrichedProduct) -> dict:
     for i, source in enumerate(ref_pool[:5], start=1):
         row[f"Ref URL {i}"] = source.url
 
-        # 3. Resolved identity fields.
+    # 3. Resolved identity fields.
     manufacturer_name = _resolve_manufacturer_name(enriched)
     row["MANUFACTURER_NAME"] = manufacturer_name
     row["BRAND_NAME"] = manufacturer_name
@@ -192,7 +213,7 @@ def map_row_to_headers(raw_row: dict, enriched: EnrichedProduct) -> dict:
     for i, (spec_name, field) in enumerate(list(specs.items())[:50], start=1):
         if not field.value:
             continue
-        value, uom = _split_value_uom(field.value)
+        value, uom = _split_value_uom_for_spec(spec_name, field.value)
         row[f"ATTRIBUTE_LABEL {i}"] = spec_name
         row[f"ATTRIBUTE_VALUE {i}"] = value
         row[f"ATTRIBUTE_UOM {i}"] = uom
