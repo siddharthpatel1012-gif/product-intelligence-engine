@@ -38,10 +38,27 @@ def _read_xlsx(content: bytes) -> list[dict]:
     except StopIteration:
         return []
     headers = [str(h).strip() if h is not None else "" for h in header_row]
+    all_rows_raw = [r for r in rows_iter if not (r is None or all(v is None for v in r))]
+
+    # Defensive fallback for a common Excel mistake: pasting CSV text
+    # into a spreadsheet without splitting it into columns leaves the
+    # whole comma-separated line sitting in a single cell (column A)
+    # for every row. Detect that shape — one header cell containing
+    # commas, one value cell per data row also containing the same
+    # number of commas — and re-split on comma rather than silently
+    # returning unusable single-column rows.
+    if len(headers) == 1 and "," in headers[0]:
+        split_headers = [h.strip() for h in headers[0].split(",")]
+        looks_like_csv_in_one_cell = all(
+            len(row) == 1 and isinstance(row[0], str) and row[0].count(",") == headers[0].count(",")
+            for row in all_rows_raw
+        ) if all_rows_raw else True
+        if looks_like_csv_in_one_cell:
+            headers = split_headers
+            all_rows_raw = [tuple(v.split(",")) for (v,) in all_rows_raw]
+
     rows = []
-    for raw in rows_iter:
-        if raw is None or all(v is None for v in raw):
-            continue
+    for raw in all_rows_raw:
         row = {headers[i]: raw[i] for i in range(min(len(headers), len(raw)))}
         rows.append(row)
     return rows
