@@ -244,6 +244,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="single">Single Lookup</button>
     <button class="tab" data-tab="compare">Batch Compare</button>
+    <button class="tab" data-tab="batchfile">Batch File</button>
   </div>
 
   <div class="tab-panel active" id="tab-single">
@@ -323,6 +324,36 @@
     </div>
   </div>
 
+  <div class="tab-panel" id="tab-batchfile">
+    <div class="panel">
+      <div class="panel-head"><span>Batch File — Expected Output Format</span><span id="batchfile-status-dot" style="color:var(--text-dim)">●</span></div>
+      <div class="panel-body">
+        <p class="subtitle" style="margin:0 0 18px;max-width:none;">
+          Upload a CSV or XLSX of raw catalogue rows
+          (<code style="color:var(--accent);">Mfg_Part_Num, Part_Desc, E1_Brand, Unilog_Brand, DIB_Brand, Part_Manuf</code>).
+          Each row runs through the full four-stage pipeline, then gets mapped into the exact fixed
+          Expected Output header schema and returned as a single downloadable XLSX.
+        </p>
+        <div class="field">
+          <label for="batchfile-input">Input file (.csv or .xlsx)</label>
+          <input type="file" id="batchfile-input" accept=".csv,.xlsx,.xlsm"
+                 style="width:100%;background:var(--bg);border:1px solid var(--grid-line);color:var(--text-primary);font-family:var(--font-mono);font-size:13px;padding:10px 11px;">
+          <p class="field-hint" id="batchfile-filename">No file selected.</p>
+        </div>
+        <button class="btn" id="batchfile-run-btn">Process File → Download XLSX</button>
+        <p class="field-hint" id="batchfile-status" style="margin-top:10px;"></p>
+        <details class="advanced">
+          <summary>API connection</summary>
+          <div class="field">
+            <label for="batchfile-api-base">Backend URL</label>
+            <input type="text" id="batchfile-api-base" placeholder="http://localhost:8000" value="http://localhost:8000">
+            <p class="field-hint">Posts the file to {url}/enrich/batch-file. Capped at a small row count per request — see the endpoint's error message if a file is rejected as too large.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <div class="legend">
       <span><span class="led high"></span> High confidence — ships as-is</span>
@@ -341,8 +372,10 @@
 // clicks the deployed link doesn't need to type anything to make it work.
 (function autoDetectBackendUrl(){
   if(window.location.protocol.startsWith('http') && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'){
-    const field = document.getElementById('api-base');
-    if(field) field.value = window.location.origin;
+    ['api-base', 'batchfile-api-base'].forEach(id => {
+      const field = document.getElementById(id);
+      if(field) field.value = window.location.origin;
+    });
   }
 })();
 
@@ -729,6 +762,72 @@ document.getElementById('run-queue-btn').addEventListener('click', async () => {
   }
   statusEl.textContent = 'idle';
   runBtnQ.disabled = false;
+});
+
+// ---- Batch File tab: upload CSV/XLSX -> download the fixed-header XLSX ----
+const batchFileInput = document.getElementById('batchfile-input');
+const batchFileNameEl = document.getElementById('batchfile-filename');
+const batchFileRunBtn = document.getElementById('batchfile-run-btn');
+const batchFileStatusEl = document.getElementById('batchfile-status');
+const batchFileStatusDot = document.getElementById('batchfile-status-dot');
+
+batchFileInput.addEventListener('change', () => {
+  const f = batchFileInput.files[0];
+  batchFileNameEl.textContent = f ? `Selected: ${f.name} (${(f.size/1024).toFixed(1)} KB)` : 'No file selected.';
+});
+
+batchFileRunBtn.addEventListener('click', async () => {
+  const file = batchFileInput.files[0];
+  if(!file){
+    batchFileStatusEl.textContent = 'Choose a .csv or .xlsx file first.';
+    batchFileStatusEl.style.color = 'var(--sig-low)';
+    return;
+  }
+  const apiBase = document.getElementById('batchfile-api-base').value.trim().replace(/\/$/,'') || 'http://localhost:8000';
+
+  batchFileRunBtn.disabled = true;
+  batchFileStatusDot.style.color = 'var(--accent)';
+  batchFileStatusEl.style.color = 'var(--text-muted)';
+  batchFileStatusEl.textContent = `Processing ${file.name} — this runs the full pipeline per row and can take a minute or more...`;
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const resp = await fetch(`${apiBase}/enrich/batch-file`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if(!resp.ok){
+      let detail = `HTTP ${resp.status}`;
+      try {
+        const errJson = await resp.json();
+        if(errJson.detail) detail = errJson.detail;
+      } catch(e) { /* response wasn't JSON, keep default detail */ }
+      throw new Error(detail);
+    }
+
+    const blob = await resp.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = 'enriched_output.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+
+    batchFileStatusDot.style.color = 'var(--sig-high)';
+    batchFileStatusEl.style.color = 'var(--sig-high)';
+    batchFileStatusEl.textContent = `Done — enriched_output.xlsx downloaded.`;
+  } catch(e) {
+    batchFileStatusDot.style.color = 'var(--sig-low)';
+    batchFileStatusEl.style.color = 'var(--sig-low)';
+    batchFileStatusEl.textContent = `Error: ${e.message}`;
+  } finally {
+    batchFileRunBtn.disabled = false;
+  }
 });
 </script>
 </body>
